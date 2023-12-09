@@ -36,10 +36,6 @@ const START_FOLDER_PATH = "";
 // ATTENTION: If true, this setting will start a new iteration in any case! A set START_FOLDER_PATH and a persisted iterator are ignored!
 const FORCE_NEW_ITERATION = false;
 
-// Call script again automatically if iteration is not finished
-// Notice: This setting only works if START_FOLDER_PATH is empty and FORCE_NEW_ITERATION is false! Otherwise there would be an infinite loop of calls.
-const CALL_SCRIPT_AGAIN = true;
-
 // Name of the report spreadsheet in the Google Drive root folder to save the results.
 // If the spreadsheet doesn't exist yet, a new one is created.
 const REPORT_SPREADSHEET_NAME = "shared_files_and_folders_report";
@@ -55,7 +51,7 @@ const REPORT_SPREADSHEET_CELL_ITERATION_FINISHED = "B3";
 
 // Stop script execution after specified runtime and save current iteration state for next execution.
 // This avoids exceeding the maximum execution time predefined by Google and ensures that the current progress is persisted.
-const MAX_EXECUTION_TIME_IN_MS = 5 * 60 * 1000; // 5 min
+const MAX_EXECUTION_TIME_IN_MS = 4 * 60 * 1000; // 4 min
 
 // Key for the recursive iterator in the user properties of the script.
 // Used to persist the last iteration progress between multiple script executions.
@@ -72,7 +68,7 @@ const LOG_LEVEL = {
 };
 
 // Set the current log level (adjust as needed)
-const currentLogLevel = LOG_LEVEL.DEBUG; // Change this to control log level
+const currentLogLevel = LOG_LEVEL.INFO; // Change this to control log level
 
 // Log messages based on log level
 function logMessage(message, logLevel) {
@@ -97,14 +93,13 @@ function logMessage(message, logLevel) {
   }
 }
 
-// TODO Delete after test
-function temp() {
+
+
+function debug() {
   let userProperties = PropertiesService.getUserProperties();
-  //userProperties.deleteAllProperties()
-  logMessage("All set user properties for the current user and script:\n" + JSON.stringify(userProperties.getProperties()), LOG_LEVEL.INFO);
-  console.log(DriveApp.getRootFolder().getName());
-  console.log((new Date()).toLocaleString());
+  prettyPrintUserProperties(userProperties);
 }
+
 
 
 function main() {
@@ -112,11 +107,7 @@ function main() {
 
   let userProperties = PropertiesService.getUserProperties();
 
-  formattedPropertiesForPrinting = JSON.stringify(userProperties.getProperties()).replace(/\\/g, ""); // Remove all backslashes "\" (used as escape character for quotes)
-  formattedPropertiesForPrinting = formattedPropertiesForPrinting.replace(/\"\[/g, "["); // Remove all quotes at the beginning of arrays
-  formattedPropertiesForPrinting = formattedPropertiesForPrinting.replace(/\]\"/g, "]"); // Remove all quotes at the end of the arrays
-  formattedPropertiesForPrinting = JSON.stringify(JSON.parse(formattedPropertiesForPrinting), null, 2);
-  logMessage("All set user properties for the current user and script:\n" + formattedPropertiesForPrinting, LOG_LEVEL.INFO);
+  prettyPrintUserProperties(userProperties);
   logMessage(`End script execution after ${MAX_EXECUTION_TIME_IN_MS/1000} s`, LOG_LEVEL.INFO);
 
   logMessage("Create list of shared files and folders...", LOG_LEVEL.INFO);
@@ -135,20 +126,8 @@ function main() {
     if (timeLimitExceeded) {
       userProperties.setProperty(RECURSIVE_ITERATOR_KEY, JSON.stringify(recursiveIterator));
       sheet.getRange(REPORT_SPREADSHEET_CELL_ITERATION_FINISHED).setValue("no");
-      logMessage(`Stop iteration after "${elapsedTimeInMS/1000}" seconds.`, LOG_LEVEL.INFO);
-
-      if (CALL_SCRIPT_AGAIN === true) {
-        if (FORCE_NEW_ITERATION === true || START_FOLDER_PATH !== "") {
-          logMessage("Script can't be called automatically again! The configuration FORCE_NEW_ITERATION must be false and START_FOLDER_PATH must be empty.", LOG_LEVEL.WARN);
-        }
-        else {
-          logMessage("Call script again automatically to continue iteration.", LOG_LEVEL.INFO);
-          // todo enter api call link.
-          return;
-        }
-      }
-
-      logMessage("Run script again manually to resume iteration.", LOG_LEVEL.INFO);
+      logMessage(`Stop iteration after "${elapsedTimeInMS/1000}" seconds. Run script again to resume iteration.`, LOG_LEVEL.INFO);
+      prettyPrintUserProperties(userProperties);
       return;
     }
   }
@@ -156,6 +135,22 @@ function main() {
   userProperties.deleteProperty(RECURSIVE_ITERATOR_KEY);
   sheet.getRange(REPORT_SPREADSHEET_CELL_ITERATION_FINISHED).setValue("yes");
   logMessage("Iteration finished!", LOG_LEVEL.INFO);
+}
+
+
+function prettyPrintUserProperties(userProperties) {
+  let formattedProperties = JSON.stringify(userProperties.getProperties()).replace(/\\/g, ""); // Remove all backslashes "\" (used as escape character for quotes)
+
+  formattedProperties = formattedProperties.replace("\"[", "["); // Remove quotes at the beginning of the first array
+
+  // Remove quotes at the end of the last array
+  const lastIndexOfSquareBracket = formattedProperties.lastIndexOf("]\"");
+  if (lastIndexOfSquareBracket !== -1) {
+    formattedProperties = formattedProperties.substring(0, lastIndexOfSquareBracket) + formattedProperties.substring(lastIndexOfSquareBracket).replace("]\"", "]");
+  }
+
+  formattedProperties = JSON.stringify(JSON.parse(formattedProperties), null, 2); // Format with indentation
+  logMessage("All set user properties for the current user and script:\n" + formattedProperties, LOG_LEVEL.INFO);
 }
 
 
@@ -257,7 +252,7 @@ function getFolderByPath(path) {
 
 function makeIterationFromFolder(folder) {
   return {
-    folderName: folder.getName(), 
+    folderName: folder.getName(),
     fileIteratorContinuationToken: folder.getFiles().getContinuationToken(),
     folderIteratorContinuationToken: folder.getFolders().getContinuationToken()
   };
@@ -319,33 +314,6 @@ function listFilesAndFolders(recursiveIterator, sheet) {
   logMessage("Iterator failure!", LOG_LEVEL.ERROR);
   throw "Should never get here. Iterator failure!";
 }
-
-
-// TODO delete
-//function listFilesAndFolders(folder, folderPath, sheet) {
-//  let subfolders = folder.getFolders();
-//  while (subfolders.hasNext()) {
-//    let subfolder = subfolders.next();
-//
-//    let access = getSharingAccess(subfolder);
-//    if (access != "Private") {
-//      logMessage(`Add shared folder "${folderPath + subfolder.getName()}" to sheet...`, LOG_LEVEL.INFO);
-//      sheet.appendRow([folderPath + subfolder.getName(), "Folder", access]);
-//    }
-//  
-//    listFilesAndFolders(subfolder, folderPath + subfolder.getName() + "/", sheet);
-//  }
-//
-//  let files = folder.getFiles();
-//  while (files.hasNext()) {
-//    let file = files.next();
-//    let access = getSharingAccess(file);
-//    if (access != "Private") {
-//      logMessage(`Add shared file "${folderPath + file.getName()}" to sheet...`, LOG_LEVEL.INFO);
-//      sheet.appendRow([folderPath + file.getName(), "File", access]);
-//    }
-//  }
-//}
 
 
 function getSharingAccess(item) {
