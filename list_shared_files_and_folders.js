@@ -2,6 +2,10 @@
 // The results are written to a spreadsheet.
 // The iteration itself needs multiple script executions because the predefined maximum runtime for scripts is too short to check all folders and files.
 // To allow future script executions to continue the last iteration, the recursive iterator is persisted in user properties of this script.
+
+// To start the script run the main() function.
+// To debug code run the debug() function and adapt it as necessary.
+
 // NOTICE:
 // Consider enabling an automatic, time-based trigger for the script in the Google AppScript interface.
 // On this way the script will run repeatedly resuming the last iteration. You need to check manually in the result sheet if the whole iteration has been finished
