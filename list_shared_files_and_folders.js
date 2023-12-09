@@ -2,6 +2,10 @@
 // The results are written to a spreadsheet.
 // The iteration itself needs multiple script executions because the predefined maximum runtime for scripts is too short to check all folders and files.
 // To allow future script executions to continue the last iteration, the recursive iterator is persisted in user properties of this script.
+// NOTICE:
+// Consider enabling an automatic, time-based trigger for the script in the Google AppScript interface.
+// On this way the script will run repeatedly resuming the last iteration. You need to check manually in the result sheet if the whole iteration has been finished
+// so that you can turn off the automatic trigger again.
 
 // --- Start folder for iteration ---
 
@@ -51,6 +55,10 @@ const REPORT_SPREADSHEET_CELL_ITERATION_FINISHED = "B3";
 
 // Stop script execution after specified runtime and save current iteration state for next execution.
 // This avoids exceeding the maximum execution time predefined by Google and ensures that the current progress is persisted.
+// NOTICE:
+// If an automatic, time-based trigger is used for the script (see comment above), the maximum execution time needs to be shorter than the trigger interval!
+// Otherwise multiple script executions are started in parallel all using the same persisted iterator from the last finished execution.
+// However all script executions must be strictly sequential so that the iterator is persisted and the next execution can continue the iteration.
 const MAX_EXECUTION_TIME_IN_MS = 4 * 60 * 1000; // 4 min
 
 // Key for the recursive iterator in the user properties of the script.
